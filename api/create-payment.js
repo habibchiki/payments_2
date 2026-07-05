@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const axios = require("axios");
 
 module.exports = async (req, res) => {
     try {
@@ -29,52 +30,38 @@ module.exports = async (req, res) => {
 
         const orderId = `order_${Date.now()}`;
 
+        const baseObj = {
+            Amount: String(amount),
+            Description: description || "Оплата",
+            OrderId: orderId,
+            Password: password,
+            TerminalKey: terminalKey
+        };
+
         const token = crypto.createHash("sha256")
             .update(
-                Object.keys({
-                    Amount: String(amount),
-                    Description: description || "Оплата",
-                    OrderId: orderId,
-                    Password: password,
-                    TerminalKey: terminalKey
-                })
-                .sort()
-                .map(k =>
-                    ({
-                        Amount: String(amount),
-                        Description: description || "Оплата",
-                        OrderId: orderId,
-                        Password: password,
-                        TerminalKey: terminalKey
-                    })[k]
-                )
-                .join("")
+                Object.keys(baseObj)
+                    .sort()
+                    .map(k => baseObj[k])
+                    .join("")
             )
             .digest("hex");
 
-        const response = await fetch("https://securepay.tinkoff.ru/v2/Init", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+        const response = await axios.post(
+            "https://securepay.tinkoff.ru/v2/Init",
+            {
                 TerminalKey: terminalKey,
                 Amount: amount,
                 OrderId: orderId,
                 Description: description || "Оплата",
                 Token: token
-            })
-        });
+            },
+            {
+                headers: { "Content-Type": "application/json" }
+            }
+        );
 
-        const text = await response.text();
-
-        let data;
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            return res.status(500).json({
-                error: "Bank returned non-JSON",
-                raw: text
-            });
-        }
+        const data = response.data;
 
         if (!data.Success) {
             return res.status(400).json(data);
@@ -85,9 +72,11 @@ module.exports = async (req, res) => {
         });
 
     } catch (e) {
-        console.error(e);
+        console.error("ERROR:", e?.response?.data || e.message);
+
         return res.status(500).json({
-            error: e.message || "unknown error"
+            error: e.message,
+            details: e?.response?.data || null
         });
     }
 };
