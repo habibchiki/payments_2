@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
 
         const orderId = `order_${Date.now()}`;
 
-        const payloadForSign = {
+        const base = {
             Amount: String(amount),
             Description: description || "Оплата",
             OrderId: orderId,
@@ -38,63 +38,31 @@ module.exports = async (req, res) => {
         };
 
         const token = crypto.createHash("sha256")
-            .update(
-                Object.keys(payloadForSign)
-                    .sort()
-                    .map(k => payloadForSign[k])
-                    .join("")
-            )
+            .update(Object.keys(base).sort().map(k => base[k]).join(""))
             .digest("hex");
 
-        let tbankResponse;
-        let tbankData;
+        const response = await fetch("https://securepay.tinkoff.ru/v2/Init", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                TerminalKey: terminalKey,
+                Amount: amount,
+                OrderId: orderId,
+                Description: description || "Оплата",
+                Token: token
+            })
+        });
 
-        try {
-            tbankResponse = await fetch("https://securepay.tinkoff.ru/v2/Init", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    TerminalKey: terminalKey,
-                    Amount: amount,
-                    OrderId: orderId,
-                    Description: description || "Оплата",
-                    Token: token
-                })
-            });
-
-            const text = await tbankResponse.text();
-
-            try {
-                tbankData = JSON.parse(text);
-            } catch (e) {
-                return res.status(500).json({
-                    error: "Bank returned invalid response",
-                    raw: text
-                });
-            }
-
-        } catch (e) {
-            return res.status(500).json({
-                error: "Request to bank failed",
-                details: e.message
-            });
-        }
-
-        if (!tbankData || !tbankData.Success) {
-            return res.status(400).json({
-                error: tbankData?.Message || "Bank error",
-                raw: tbankData
-            });
-        }
+        const data = await response.json();
 
         return res.status(200).json({
-            paymentUrl: tbankData.PaymentURL
+            paymentUrl: data.PaymentURL || null,
+            raw: data
         });
 
     } catch (e) {
         return res.status(500).json({
-            error: "Server crash",
-            details: e.message
+            error: e.message
         });
     }
 };
