@@ -2,33 +2,28 @@ const crypto = require("crypto");
 
 module.exports = async (req, res) => {
 
-    // 🔥 CORS (разрешаем браузеру с Taplink)
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-    // 🔥 обработка preflight запроса
     if (req.method === "OPTIONS") {
         return res.status(200).end();
     }
 
-    // разрешаем только POST
     if (req.method !== "POST") {
-        return res.status(405).json({ error: "Only POST allowed" });
+        return res.status(200).json({ error: "Only POST allowed" });
     }
 
     try {
         const terminalKey = process.env.TERMINAL_KEY;
         const password = process.env.TERMINAL_PASSWORD;
 
-        if (!terminalKey || !password) {
-            return res.status(500).json({ error: "ENV не настроены в Vercel" });
-        }
-
         const { amount, description } = req.body || {};
 
+        if (!terminalKey || !password) {
+            return res.status(500).json({ error: "ENV not set" });
+        }
+
         if (!amount) {
-            return res.status(400).json({ error: "Нет суммы" });
+            return res.status(400).json({ error: "No amount" });
         }
 
         const orderId = `order_${Date.now()}`;
@@ -64,6 +59,8 @@ module.exports = async (req, res) => {
         });
 
     } catch (e) {
-        return res.status(500).json({ error: e.message });
+        return res.status(500).json({
+            error: e.message
+        });
     }
 };
