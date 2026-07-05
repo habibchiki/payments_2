@@ -1,30 +1,34 @@
 const crypto = require("crypto");
 
 module.exports = async (req, res) => {
+
+    // 🔥 CORS (разрешаем браузеру с Taplink)
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    // 🔥 обработка preflight запроса
+    if (req.method === "OPTIONS") {
+        return res.status(200).end();
+    }
+
+    // разрешаем только POST
+    if (req.method !== "POST") {
+        return res.status(405).json({ error: "Only POST allowed" });
+    }
+
     try {
-        res.setHeader("Access-Control-Allow-Origin", "*");
-        res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-        if (req.method === "OPTIONS") {
-            return res.status(200).end();
-        }
-
-        if (req.method !== "POST") {
-            return res.status(405).json({ error: "Only POST allowed" });
-        }
-
         const terminalKey = process.env.TERMINAL_KEY;
         const password = process.env.TERMINAL_PASSWORD;
 
         if (!terminalKey || !password) {
-            return res.status(500).json({ error: "ENV not set" });
+            return res.status(500).json({ error: "ENV не настроены в Vercel" });
         }
 
         const { amount, description } = req.body || {};
 
         if (!amount) {
-            return res.status(400).json({ error: "No amount" });
+            return res.status(400).json({ error: "Нет суммы" });
         }
 
         const orderId = `order_${Date.now()}`;
@@ -56,13 +60,10 @@ module.exports = async (req, res) => {
         const data = await response.json();
 
         return res.status(200).json({
-            paymentUrl: data.PaymentURL || null,
-            raw: data
+            paymentUrl: data.PaymentURL || null
         });
 
     } catch (e) {
-        return res.status(500).json({
-            error: e.message
-        });
+        return res.status(500).json({ error: e.message });
     }
 };
