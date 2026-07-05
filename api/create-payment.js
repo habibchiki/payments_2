@@ -1,5 +1,4 @@
 const crypto = require("crypto");
-const axios = require("axios");
 
 module.exports = async (req, res) => {
     try {
@@ -30,7 +29,7 @@ module.exports = async (req, res) => {
 
         const orderId = `order_${Date.now()}`;
 
-        const baseObj = {
+        const payloadForSign = {
             Amount: String(amount),
             Description: description || "Оплата",
             OrderId: orderId,
@@ -40,43 +39,62 @@ module.exports = async (req, res) => {
 
         const token = crypto.createHash("sha256")
             .update(
-                Object.keys(baseObj)
+                Object.keys(payloadForSign)
                     .sort()
-                    .map(k => baseObj[k])
+                    .map(k => payloadForSign[k])
                     .join("")
             )
             .digest("hex");
 
-        const response = await axios.post(
-            "https://securepay.tinkoff.ru/v2/Init",
-            {
-                TerminalKey: terminalKey,
-                Amount: amount,
-                OrderId: orderId,
-                Description: description || "Оплата",
-                Token: token
-            },
-            {
-                headers: { "Content-Type": "application/json" }
+        let tbankResponse;
+        let tbankData;
+
+        try {
+            tbankResponse = await fetch("https://securepay.tinkoff.ru/v2/Init", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    TerminalKey: terminalKey,
+                    Amount: amount,
+                    OrderId: orderId,
+                    Description: description || "Оплата",
+                    Token: token
+                })
+            });
+
+            const text = await tbankResponse.text();
+
+            try {
+                tbankData = JSON.parse(text);
+            } catch (e) {
+                return res.status(500).json({
+                    error: "Bank returned invalid response",
+                    raw: text
+                });
             }
-        );
 
-        const data = response.data;
+        } catch (e) {
+            return res.status(500).json({
+                error: "Request to bank failed",
+                details: e.message
+            });
+        }
 
-        if (!data.Success) {
-            return res.status(400).json(data);
+        if (!tbankData || !tbankData.Success) {
+            return res.status(400).json({
+                error: tbankData?.Message || "Bank error",
+                raw: tbankData
+            });
         }
 
         return res.status(200).json({
-            paymentUrl: data.PaymentURL
+            paymentUrl: tbankData.PaymentURL
         });
 
     } catch (e) {
-        console.error("ERROR:", e?.response?.data || e.message);
-
         return res.status(500).json({
-            error: e.message,
-            details: e?.response?.data || null
+            error: "Server crash",
+            details: e.message
         });
     }
 };
