@@ -9,13 +9,15 @@ module.exports = async (req, res) => {
             return res.status(500).send("Не настроены переменные окружения");
         }
 
-        const amount = Number(req.query.amount);
-        const description = req.query.description || "Оплата";
+        const amount = parseInt(req.query.amount, 10);
 
-        if (!amount || isNaN(amount)) {
+if (Number.isNaN(amount)) {
     return res.status(400).json({ error: "Некорректная сумма" });
 }
-    
+
+if (amount < 1000) {
+    return res.status(400).json({ error: "Минимум 10 рублей (1000 копеек)" });
+}
 
         const orderId = `order_${Date.now()}`;
 
@@ -44,7 +46,7 @@ module.exports = async (req, res) => {
             },
             body: JSON.stringify({
                 TerminalKey: terminalKey,
-                Amount: amount,
+                Amount: Number(amount),
                 OrderId: orderId,
                 Description: description,
                 Token: token
