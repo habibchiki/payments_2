@@ -10,14 +10,15 @@ module.exports = async (req, res) => {
         }
 
         const amount = parseInt(req.query.amount, 10);
+        const description = req.query.description || "Свободная оплата";
 
-if (Number.isNaN(amount)) {
-    return res.status(400).json({ error: "Некорректная сумма" });
-}
+        if (Number.isNaN(amount)) {
+            return res.status(400).json({ error: "Некорректная сумма" });
+        }
 
-if (amount < 1000) {
-    return res.status(400).json({ error: "Минимум 10 рублей (1000 копеек)" });
-}
+        if (amount < 1000) {
+            return res.status(400).json({ error: "Минимум 10 рублей (1000 копеек)" });
+        }
 
         const orderId = `order_${Date.now()}`;
 
@@ -46,7 +47,7 @@ if (amount < 1000) {
             },
             body: JSON.stringify({
                 TerminalKey: terminalKey,
-                Amount: Number(amount),
+                Amount: amount,
                 OrderId: orderId,
                 Description: description,
                 Token: token
@@ -56,9 +57,12 @@ if (amount < 1000) {
         const data = await response.json();
 
         if (!data.Success) {
+            console.error(data);
             return res.status(500).send(data.Message || "Ошибка Т-Банка");
         }
-console.log(data);
+
+        console.log(data);
+
         return res.redirect(data.PaymentURL);
 
     } catch (e) {
