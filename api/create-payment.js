@@ -9,12 +9,13 @@ module.exports = async (req, res) => {
             return res.status(500).send("Не настроены переменные окружения");
         }
 
-        const amount = parseInt(req.query.amount, 10);
+        const amount = Number(req.query.amount);
         const description = req.query.description || "Оплата";
 
-        if (!amount || amount < 1000) {
-            return res.status(400).send("Некорректная сумма");
-        }
+        if (!amount || isNaN(amount)) {
+    return res.status(400).json({ error: "Некорректная сумма" });
+}
+    
 
         const orderId = `order_${Date.now()}`;
 
