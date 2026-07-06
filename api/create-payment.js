@@ -55,7 +55,7 @@ module.exports = async (req, res) => {
         if (!data.Success) {
             return res.status(500).send(data.Message || "Ошибка Т-Банка");
         }
-
+console.log(data);
         return res.redirect(data.PaymentURL);
 
     } catch (e) {
