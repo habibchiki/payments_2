@@ -11,8 +11,7 @@ module.exports = async (req, res) => {
 
         const amount = parseInt(req.query.amount, 10);
         
-        // Исправление 1: Vercel/Node переводят параметры в нижний регистр,
-        // поэтому проверяем и req.query.email, и req.query.Email
+        // Перевод параметров в нижний регистр для Vercel/Node
         const email = req.query.email || req.query.Email || "customer@example.com";
 
         const description = "Юридические услуги";
@@ -25,8 +24,8 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: "Минимум 10 рублей (1000 копеек)" });
         }
 
-        const randomTail = Math.floor(1000 + Math.random() * 9000); //Генерирует 4 случайные цифры
-        const orderId = `order_${Date.now()}`;
+        const randomTail = Math.floor(1000 + Math.random() * 9000); // Генерирует 4 случайные цифры
+        const orderId = `order_${Date.now()}_${randomTail}`; // Защита от дублирования заказов
 
         const tokenData = {
             Amount: String(amount),
@@ -51,13 +50,13 @@ module.exports = async (req, res) => {
             Taxation: "usn_income",
             Items: [
                 {
-                    Name: description,         
+                    Name: description,        
                     Price: amount,                
                     Quantity: 1.00,            
                     Amount: amount,            
-                    PaymentMethod: "prepayment", 
+                    PaymentMethod: "prepayment",
                     PaymentObject: "service",    
-                    Tax: "vat5"                 
+                    Tax: "vat5" // <-- Установлен НДС 5% без ручного расчета суммы налога
                 }
             ]
         };
