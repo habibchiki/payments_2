@@ -25,6 +25,7 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: "Минимум 10 рублей (1000 копеек)" });
         }
 
+        const randomTail = Math.floor(1000 + Math.random() * 9000); //Генерирует 4 случайные цифры
         const orderId = `order_${Date.now()}`;
 
         const tokenData = {
