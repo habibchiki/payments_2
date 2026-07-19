@@ -10,10 +10,12 @@ module.exports = async (req, res) => {
         }
 
         const amount = parseInt(req.query.amount, 10);
-        const description = req.query.description || "Свободная оплата";
-        // Важно: для чека нужен email или телефон клиента.
-        // Передавайте его из Таплинка в query-параметрах (например, ?amount=1000&email=test@test.ru)
-        const email = req.query.email || "customer@example.com";
+        
+        // Исправление 1: Vercel/Node переводят параметры в нижний регистр,
+        // поэтому проверяем и req.query.email, и req.query.Email
+        const email = req.query.email || req.query.Email || "customer@example.com";
+
+        const description = "Юридические услуги";
 
         if (Number.isNaN(amount)) {
             return res.status(400).json({ error: "Некорректная сумма" });
@@ -25,8 +27,6 @@ module.exports = async (req, res) => {
 
         const orderId = `order_${Date.now()}`;
 
-        // 1. Токен подписывает ТОЛЬКО плоские параметры верхнего уровня.
-        // Массив Receipt сюда НЕ добавляется.
         const tokenData = {
             Amount: String(amount),
             Description: description,
@@ -45,24 +45,23 @@ module.exports = async (req, res) => {
             )
             .digest("hex");
 
-        // 2. Формируем объект чека в соответствии с 54-ФЗ и требованиями Т-Банка
         const receipt = {
-            Email: email, // Email покупателя, куда уйдет чек
-            Taxation: "usn_income", // Ваша система налогообложения (например: osn, usn_income, usn_income_outcome, patent)
+            Email: email,
+            Taxation: "usn_income",
             Items: [
                 {
-                    Name: description, // Название товара/услуги в чеке
-                    Price: amount,     // Цена за 1 шт. в копейках
-                    Quantity: 1.00,     // Количество
-                    Amount: amount,     // Общая стоимость позиции в копейках
-                    PaymentMethod: "full_prepayment", // Способ расчета (полная предоплата)
-                    PaymentObject: "service",         // Предмет расчета (услуга, или "commodity" - товар)
-                    Tax: "none"         // Ставка НДС (none - без НДС, vat20 - 20%, vat10 - 10%)
+                    Name: description,         
+                    Price: amount,                
+                    Quantity: 1.00,            
+                    Amount: amount,            
+                    PaymentMethod: "prepayment", 
+                    PaymentObject: "service",    
+                    Tax: "vat5"                 
                 }
             ]
         };
 
-        // 3. Отправляем запрос вместе с чеком
+        // Отправляем запрос вместе с чеком
         const response = await fetch("https://securepay.tinkoff.ru/v2/Init", {
             method: "POST",
             headers: {
@@ -74,7 +73,7 @@ module.exports = async (req, res) => {
                 OrderId: orderId,
                 Description: description,
                 Token: token,
-                Receipt: receipt // <-- Передаем кассовый чек
+                Receipt: receipt
             })
         });
 
