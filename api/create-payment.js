@@ -11,10 +11,18 @@ module.exports = async (req, res) => {
 
         const amount = parseInt(req.query.amount, 10);
         
-        // Перевод параметров в нижний регистр для Vercel/Node
-        const email = req.query.email || req.query.Email || "customer@example.com";
+        // Считываем email и name (с поддержкой разных регистров)
+        const email = req.query.email || req.query.Email || "";
+        const name = req.query.name || req.query.Name || "";
 
-        const description = "Юридические услуги";
+        // Формируем детальное назначение платежа для Т-Бизнес:
+        // Пример: "Юридические услуги (Плательщик: Иванов Иван Иванович)"
+        let description = "Юридические услуги";
+        if (name) {
+            description += ` (Плательщик: ${name})`;
+        } else if (email) {
+            description += ` (клиент: ${email})`;
+        }
 
         if (Number.isNaN(amount)) {
             return res.status(400).json({ error: "Некорректная сумма" });
@@ -24,9 +32,10 @@ module.exports = async (req, res) => {
             return res.status(400).json({ error: "Минимум 10 рублей (1000 копеек)" });
         }
 
-        const randomTail = Math.floor(1000 + Math.random() * 9000); // Генерирует 4 случайные цифры
-        const orderId = `order_${Date.now()}_${randomTail}`; // Защита от дублирования заказов
+        const randomTail = Math.floor(1000 + Math.random() * 9000);
+        const orderId = `order_${Date.now()}_${randomTail}`;
 
+        // Расчет токена
         const tokenData = {
             Amount: String(amount),
             Description: description,
@@ -45,36 +54,39 @@ module.exports = async (req, res) => {
             )
             .digest("hex");
 
+        // Объект чека
         const receipt = {
-            Email: email,
+            Email: email || "customer@example.com",
             Taxation: "usn_income",
             Items: [
                 {
-                    Name: description,        
+                    Name: "Юридические услуги", // В самом чеке кассы оставляем чистое название
                     Price: amount,                
                     Quantity: 1.00,            
                     Amount: amount,            
                     PaymentMethod: "prepayment",
                     PaymentObject: "service",    
-                    Tax: "vat5" // <-- Установлен НДС 5% без ручного расчета суммы налога
+                    Tax: "vat5"
                 }
             ]
         };
 
-        // Отправляем запрос вместе с чеком
+        // Формируем итоговое тело запроса к Т-Банку
+        const payload = {
+            TerminalKey: terminalKey,
+            Amount: amount,
+            OrderId: orderId,
+            Description: description,
+            Token: token,
+            Receipt: receipt
+        };
+
         const response = await fetch("https://securepay.tinkoff.ru/v2/Init", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                TerminalKey: terminalKey,
-                Amount: amount,
-                OrderId: orderId,
-                Description: description,
-                Token: token,
-                Receipt: receipt
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();
@@ -83,8 +95,6 @@ module.exports = async (req, res) => {
             console.error("Ошибка Т-Банка:", data);
             return res.status(500).send(data.Details || data.Message || "Ошибка Т-Банка");
         }
-
-        console.log("Успешный ответ:", data);
 
         return res.redirect(data.PaymentURL);
 
